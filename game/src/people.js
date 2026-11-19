@@ -59,6 +59,7 @@ export class Pedestrian {
     this.walkPhase = rng() * 10;
     this.isPassenger = false;
     this.marker = null;
+    this.rng = rng; // kept so walk/flee choices stay seeded, like the city
   }
 
   get x() { return this.mesh.position.x; }
@@ -134,7 +135,7 @@ export class Pedestrian {
         }
         const neighbours = this.graph.edges.get(this.graph.nodes.indexOf(best));
         this.from = this.graph.nodes.indexOf(best);
-        this.to = neighbours[Math.floor(Math.random() * neighbours.length)];
+        this.to = neighbours[Math.floor(this.rng() * neighbours.length)];
         this.t = 0;
       }
     } else {
@@ -143,9 +144,9 @@ export class Pedestrian {
         const neighbours = this.graph.edges.get(this.to);
         const choices = neighbours.filter((n) => n !== this.from);
         this.from = this.to;
-        this.to = choices.length ? choices[Math.floor(Math.random() * choices.length)] : neighbours[0];
+        this.to = choices.length ? choices[Math.floor(this.rng() * choices.length)] : neighbours[0];
         this.t = 0;
-        if (Math.random() < 0.3) this.side = -this.side;
+        if (this.rng() < 0.3) this.side = -this.side;
       }
       this.placeOnEdge();
       this.walkPhase += dt * 7;

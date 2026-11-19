@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neon Harbor — an open-world crime game</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0c1420; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #f2f2f2; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  /* --- In-game HUD --- */
+  #hud { position: fixed; inset: 0; pointer-events: none; display: none; }
+  .panel { background: rgba(8, 14, 24, 0.72); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 8px 12px; }
+  #top-left { position: absolute; top: 14px; left: 14px; display: flex; flex-direction: column; gap: 8px; }
+  #stars { font-size: 26px; letter-spacing: 4px; color: #888; }
+  #cash { font-size: 22px; font-weight: 700; color: #7dff9a; }
+  #health { width: 190px; }
+  #health .bar { height: 10px; background: #333; border-radius: 5px; overflow: hidden; }
+  #health-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #e74c3c, #f39c12, #2ecc71); }
+  #health-num { font-size: 12px; opacity: 0.85; }
+  #top-right { position: absolute; top: 14px; right: 14px; }
+  #minimap { width: 180px; height: 180px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.25); background: #1d2b1a; }
+  #mission { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); text-align: center; max-width: 640px; }
+  #mission-name { font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: #ffd76a; }
+  #objective { font-size: 17px; font-weight: 600; margin-top: 2px; }
+  #objective-dist { font-size: 14px; color: #9fd8ff; }
+  #bottom-right { position: absolute; right: 14px; bottom: 14px; text-align: right; }
+  #speed { font-size: 26px; font-weight: 800; }
+  #ammo { font-size: 14px; opacity: 0.9; margin-top: 2px; }
+  #messages { position: absolute; left: 14px; bottom: 14px; max-width: 420px; display: flex; flex-direction: column; gap: 4px; }
+  #messages .msg { background: rgba(8, 14, 24, 0.72); border-left: 3px solid #ffd76a; border-radius: 6px; padding: 6px 10px; font-size: 14px; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; display: none; }
+  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: #fff; }
+  #crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
+  #crosshair::after { left: 0; top: 8px; width: 18px; height: 2px; }
+  #toast { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); font-size: 26px; font-weight: 800; color: #ffd76a; text-shadow: 0 2px 8px #000; opacity: 0; transition: opacity 0.4s; text-align: center; }
+
+  /* --- Full-screen menus --- */
+  .screen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; text-align: center; background: radial-gradient(ellipse at center, rgba(8,14,24,0.25) 0%, rgba(8,14,24,0.78) 100%); }
+  .screen h1 { font-size: 58px; margin: 0; letter-spacing: 3px; color: #ffd76a; text-shadow: 0 4px 24px rgba(0,0,0,0.8); }
+  .screen h2 { font-size: 30px; margin: 0 0 10px; color: #ffd76a; }
+  .screen .sub { font-size: 18px; color: #dfe9f5; max-width: 560px; line-height: 1.5; }
+  .screen .keys { margin-top: 22px; font-size: 15px; line-height: 1.9; color: #c9d6e8; background: rgba(8,14,24,0.6); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 12px 22px; text-align: left; }
+  .screen .keys b { color: #fff; }
+  .screen .press { margin-top: 26px; font-size: 18px; font-weight: 700; animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .screen .save { margin-top: 14px; font-size: 15px; color: #9fd8ff; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<canvas id="game" aria-label="Neon Harbor: an open-world crime game. Drive, steal cars, outrun the police and run missions across the city."></canvas>
+<p id="status" role="status" aria-live="polite"></p>
+
+<div id="hud">
+  <div id="top-left">
+    <div class="panel"><div id="stars">☆☆☆☆☆</div><div id="cash">$200</div></div>
+    <div class="panel" id="health"><div class="bar"><div id="health-fill"></div></div><div id="health-num">100</div></div>
+  </div>
+  <div id="top-right"><canvas id="minimap" width="180" height="180"></canvas></div>
+  <div id="mission" class="panel"><div id="mission-name">Mission 1 — First Wheels</div><div id="objective"></div><div id="objective-dist"></div></div>
+  <div id="bottom-right"><div class="panel"><div id="speed"></div><div id="ammo"></div></div></div>
+  <div id="messages"></div>
+  <div id="crosshair"></div>
+  <div id="toast"></div>
+</div>
+
+<div class="screen" id="screen-title">
+  <h1>NEON HARBOR</h1>
+  <p class="sub">A sun-soaked open-world crime game. Jax Marlowe owes Vera Kade — five jobs stand between him and a clean slate. Drive, steal cars, outrun the police, and run the missions across a living coastal city.</p>
+  <div class="keys">
+    <b>W A S D</b> — walk / drive &nbsp;·&nbsp; <b>Shift</b> — run<br>
+    <b>E</b> — enter / steal / exit a car &nbsp;·&nbsp; <b>Space</b> — handbrake<br>
+    <b>F</b> — punch &nbsp;·&nbsp; <b>Q</b> — pistol &nbsp;·&nbsp; <b>Click</b> — shoot<br>
+    <b>Drag mouse</b> — look around &nbsp;·&nbsp; <b>P</b> — pause &nbsp;·&nbsp; <b>R</b> — restart mission &nbsp;·&nbsp; <b>M</b> — mute
+  </div>
+  <div class="press">Press ENTER to start</div>
+  <div class="save" id="title-save"></div>
+  <div class="save" id="title-stats"></div>
+  <div class="save">Backspace on this screen starts a new game.</div>
+</div>
+
+<div class="screen" id="screen-pause">
+  <h2>Paused</h2>
+  <p class="sub">Neon Harbor waits for no one — except right now.</p>
+  <div class="press">Press P or Esc to continue</div>
+</div>
+
+<div class="screen" id="screen-busted">
+  <h2>BUSTED</h2>
+  <p class="sub">The Neon Harbor police finally caught up with you. Bail paid, record kept, Vera unimpressed.</p>
+  <div class="press">Press ENTER to walk free</div>
+</div>
+
+<div class="screen" id="screen-wasted">
+  <h2>WASTED</h2>
+  <p class="sub">The clinic patched you up and kept the change. Your missions are waiting where you left them.</p>
+  <div class="press">Press ENTER to get back out there</div>
+</div>
+
+<div class="screen" id="screen-done">
+  <h2>STORY COMPLETE</h2>
+  <p class="sub">Five jobs, one armored van, and a city that never saw it coming. Vera tears up the debt — Neon Harbor is yours now.</p>
+  <div class="press">Press ENTER for free roam</div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

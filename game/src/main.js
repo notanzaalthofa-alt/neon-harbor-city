@@ -49,6 +49,8 @@ let lastTrafficHit = -10; // game time of the last traffic hit: one passing car
 // must not bill the player 25 HP per frame while it brushes past them.
 const policeRng = mulberry32(20240); // police spawn picks, kept across frames:
 // re-seeding every frame put every new cop on the same few road points.
+const fxRng = mulberry32(777); // the police-ram crash sound roll: seeded, so a
+// screenshot run plays the same sounds every time instead of rolling dice.
 
 // --- The player -------------------------------------------------------------
 function makePlayerMesh() {
@@ -321,7 +323,7 @@ function stepWorld(dt, inp, events) {
     if (touching && player.inCar) {
       playerCar.health = Math.max(0, playerCar.health - 22 * dt);
       playerCar.speed *= 1 - 1.4 * dt;
-      if (Math.random() < dt * 2) audio.crash();
+      if (fxRng() < dt * 2) audio.crash();
     }
   }
   const busted = wanted.update(dt, nearestCop, !player.inCar);

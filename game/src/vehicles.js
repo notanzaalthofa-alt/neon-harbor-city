@@ -96,6 +96,7 @@ export class TrafficCar {
   constructor(scene, graph, rng, kind = 'sedan') {
     this.graph = graph;
     this.kind = kind;
+    this.rng = rng; // kept so the next-edge choice stays seeded, like the city
     this.color = COLOURS.carPalette[Math.floor(rng() * COLOURS.carPalette.length)];
     if (kind === 'taxi') this.color = 0xf1c40f;
     this.mesh = makeCarMesh(this.color, kind);
@@ -145,7 +146,7 @@ export class TrafficCar {
       const neighbours = this.graph.edges.get(this.to);
       const choices = neighbours.filter((n) => n !== this.from);
       this.from = this.to;
-      this.to = choices.length ? choices[Math.floor(Math.random() * choices.length)] : neighbours[0];
+      this.to = choices.length ? choices[Math.floor(this.rng() * choices.length)] : neighbours[0];
       this.t = 0;
     }
     this.placeOnEdge();

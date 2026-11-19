@@ -39,13 +39,18 @@ function wrapAngle(a) {
   return a;
 }
 
-// Steer the player's car toward a point, braking for sharp turns and arrivals.
+// Steer the player's car toward a point, slowing for the turn ahead: a sharp
+// turn at full speed overshoots the corner into the building across the
+// intersection. Never cut the throttle to zero for a big steering error — a
+// stopped car cannot turn at all (turn authority is zero at speed zero), so
+// the car would sit dead in the road forever. Instead cap the speed: full
+// throttle below the target speed, coast above it.
 function driveToward(world, input, tx, tz) {
   const car = world.playerCar;
   const err = wrapAngle(Math.atan2(tx - car.x, tz - car.z) - car.heading);
   input.steer = clamp(err * 2.2, -1, 1);
-  const dist = dist2D(car.x, car.z, tx, tz);
-  input.throttle = Math.abs(err) > 0.7 || dist < 12 ? 0 : 1;
+  const targetSpeed = Math.abs(err) > 0.5 ? 12 : 34;
+  input.throttle = Math.abs(car.speed) < targetSpeed ? 1 : 0;
 }
 
 // Follow a route of road intersections, reversing out if the car gets stuck.
@@ -58,14 +63,14 @@ function followRoute(world, input, route, dt, state) {
   if (state.reverseTime > 0) {
     state.reverseTime -= dt;
     input.throttle = -1;
-    input.steer = -input.steer;
+    input.steer = 0; // back straight out of the wall, then re-aim
     return;
   }
   driveToward(world, input, route[state.index].x, route[state.index].z);
-  if (Math.abs(car.speed) < 1.2 && input.throttle > 0) {
+  if (Math.abs(car.speed) < 2 && input.throttle > 0) {
     state.stuckTime += dt;
-    if (state.stuckTime > 1.5) {
-      state.reverseTime = 0.9;
+    if (state.stuckTime > 1) {
+      state.reverseTime = 1.2;
       state.stuckTime = 0;
     }
   } else {
@@ -100,7 +105,7 @@ function hudFor(world) {
   const waypoint = world.missions.waypoint();
   return {
     objective: world.missions.objectiveText(),
-    missionName: world.missions.active ? `Mission ${world.missions.current + 1} — ${world.missions.name}` : 'Free Roam',
+    missionName: world.missions.active && world.missions.started ? `Mission ${world.missions.current + 1} — ${world.missions.name}` : 'Free Roam',
     stars: world.wanted.stars,
     waypointDist: waypoint ? dist2D(world.player.x, world.player.z, waypoint.x, waypoint.z) : null,
     waypoint,
@@ -165,7 +170,9 @@ export function stageShot(name, world, seed = 1) {
     const p = world.player;
     const fx = Math.sin(p.heading);
     const fz = Math.cos(p.heading);
-    world.render.poseCamera(p.x - fx * 7, 3.6, p.z - fz * 7, 140, 2, -20);
+    // High and far enough back that the player reads at the bottom of the
+    // frame instead of being cropped out behind the beacon.
+    world.render.poseCamera(p.x - fx * 9, 5, p.z - fz * 9, 140, 1.5, -20);
     return { screen: 'play', ...hudFor(world) };
   }
 

@@ -37,6 +37,7 @@ const scene = render.scene;
 const city = buildCity(scene, 1337);
 const graph = city.graph;
 const places = city.places;
+render.colliders = city.colliders; // the follow camera must not sit inside a building
 
 const save = loadSave();
 let cash = save.cash;
@@ -44,6 +45,10 @@ let screen = 'play'; // title | play | pause | busted | wasted | done
 let time = 0;
 let saveTimer = 0;
 let titleYaw = 0;
+let lastTrafficHit = -10; // game time of the last traffic hit: one passing car
+// must not bill the player 25 HP per frame while it brushes past them.
+const policeRng = mulberry32(20240); // police spawn picks, kept across frames:
+// re-seeding every frame put every new cop on the same few road points.
 
 // --- The player -------------------------------------------------------------
 function makePlayerMesh() {
@@ -308,7 +313,7 @@ function stepWorld(dt, inp, events) {
   }
 
   // Police: as many cars as stars, chasing the player, ramming on contact.
-  syncPolice(scene, police, wanted.stars, graph, player.x, player.z, mulberry32(5));
+  syncPolice(scene, police, wanted.stars, graph, player.x, player.z, policeRng);
   let nearestCop = Infinity;
   for (const cop of police) {
     const touching = cop.update(dt, player.x, player.z, city.colliders, time);
@@ -365,9 +370,10 @@ function stepWorld(dt, inp, events) {
     const swing = moving ? Math.sin(player.walkPhase) * 0.5 : 0;
     if (legL) legL.rotation.x = swing;
     if (legR) legR.rotation.x = -swing;
-    // A car that runs the player down hurts.
+    // A car that runs the player down hurts — once per brush, not per frame.
     const hitter = nearestCar(traffic, player.x, player.z, 1.6);
-    if (hitter && !hitter.parked) {
+    if (hitter && !hitter.parked && time - lastTrafficHit > 0.75) {
+      lastTrafficHit = time;
       player.health = Math.max(0, player.health - 25);
       player.x += Math.sin(player.heading) * 2;
       player.z += Math.cos(player.heading) * 2;
@@ -381,6 +387,12 @@ function stepWorld(dt, inp, events) {
       hud.pushMessage(armed ? 'Pistol out. Click to fire.' : 'Pistol away.');
     }
   }
+
+  // The visible character follows the logical player: position and heading are
+  // updated every step (the mesh was never moved, so the player walked around
+  // as an invisible camera while the character stood inside the bank).
+  player.mesh.position.set(player.x, 0, player.z);
+  player.mesh.rotation.y = player.heading;
 
   combat.update(dt, inp, {
     x: player.x,
@@ -449,7 +461,7 @@ function hudState() {
     ammo: combat.ammo,
     armed: combat.armed,
     objective: missions.objectiveText(),
-    missionName: missions.active ? `Mission ${missions.current + 1} — ${missions.name}` : 'Free Roam',
+    missionName: missions.active && missions.started ? `Mission ${missions.current + 1} — ${missions.name}` : 'Free Roam',
     waypointDist: waypoint ? dist2D(player.x, player.z, waypoint.x, waypoint.z) : null,
     playerX: player.x,
     playerZ: player.z,

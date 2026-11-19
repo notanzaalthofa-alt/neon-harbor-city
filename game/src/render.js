@@ -4,6 +4,7 @@
 // around with the mouse. Shots can freeze the camera on a posed frame.
 import * as THREE from 'three';
 import { clamp, angleLerp } from './config.js';
+import { collideCircle } from './city.js';
 
 export class Render {
   constructor(canvas) {
@@ -41,6 +42,8 @@ export class Render {
     this.camPitch = 0.34;
     this.camDist = 10;
     this.frozen = false;
+    this.colliders = null; // building boxes, set by main.js: the camera must
+    // never sit inside one, or the frame is a wall of brick.
     this.resize();
     window.addEventListener('resize', () => this.resize());
   }
@@ -55,9 +58,18 @@ export class Render {
 
   // Put the camera exactly here, looking there — used by the screenshot scenes.
   poseCamera(x, y, z, lx, ly, lz) {
-    this.camera.position.set(x, y, z);
+    const fixed = this.clearOfBuildings(x, z, y);
+    this.camera.position.set(fixed.x, y, fixed.z);
     this.camera.lookAt(lx, ly, lz);
     this.frozen = true;
+  }
+
+  // A low camera inside a building footprint shows a wall of brick: push it out
+  // to the building's edge. Only below roof height — a high camera is above the
+  // roofs and needs no pushing.
+  clearOfBuildings(x, z, y) {
+    if (!this.colliders || y >= 12) return { x, z };
+    return collideCircle(this.colliders, x, z, 2);
   }
 
   unfreeze() {
@@ -87,6 +99,9 @@ export class Render {
     );
     // Never let the camera sink under the street.
     desired.y = Math.max(desired.y, 2.2);
+    const clear = this.clearOfBuildings(desired.x, desired.z, desired.y);
+    desired.x = clear.x;
+    desired.z = clear.z;
     const k = 1 - Math.exp(-10 * dt);
     this.camera.position.lerp(desired, k);
     this.camera.lookAt(target.x + fx * 4, target.y + 1.6, target.z + fz * 4);

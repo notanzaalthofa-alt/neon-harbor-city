@@ -155,6 +155,7 @@ export class MissionManager {
   }
 
   objectiveText() {
+    if (!this.started) return 'Free Roam — explore Neon Harbor.';
     if (!this.active) return 'Story complete — Neon Harbor is yours. Free roam.';
     const stepText = [
       ['Meet Vera at the marina', 'Get in a car', 'Drive to the hideout'],

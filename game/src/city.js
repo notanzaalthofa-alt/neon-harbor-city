@@ -9,7 +9,7 @@ import { WORLD, COLOURS, mulberry32 } from './config.js';
 const ROAD_COORDS = [-180, -140, -100, -60, -20, 20, 60, 100, 140, 180];
 const BLOCK_COORDS = [-160, -120, -80, -40, 0, 40, 80, 120, 160];
 
-function makeFacadeTexture(base, windowsLit) {
+function makeFacadeTexture(base, windowsLit, rng) {
   const canvas = document.createElement('canvas');
   canvas.width = 128;
   canvas.height = 256;
@@ -20,7 +20,7 @@ function makeFacadeTexture(base, windowsLit) {
   const rows = 12;
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {
-      const lit = Math.random() < windowsLit;
+      const lit = rng() < windowsLit;
       ctx.fillStyle = lit ? '#ffd76a' : '#2c3e50';
       ctx.fillRect(8 + c * 20, 10 + r * 20, 12, 12);
     }
@@ -125,8 +125,9 @@ export function buildCity(scene, seed = 1337) {
   group.add(ground);
 
   // Facade textures: three height classes so windows stay proportional.
+  // Seeded like the rest of the city, so the same seed builds the same city.
   const facades = [0, 1, 2].map((i) => {
-    const tex = makeFacadeTexture('#cfc8b8', 0.25);
+    const tex = makeFacadeTexture('#cfc8b8', 0.25, rng);
     tex.repeat.set(1, 1 + i);
     return tex;
   });
